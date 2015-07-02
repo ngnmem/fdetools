@@ -1,0 +1,111 @@
+<html>
+<script>
+function sizeOf (bytes) {
+  		if (bytes == 0) { return "0.0 B"; }
+  		var e = Math.floor(Math.log(bytes) / Math.log(1024));
+  		console.log (e)
+  		return (bytes/Math.pow(1024, e)).toFixed(1)+' '+' KMGTP'.charAt(e)+'B';
+}
+
+function calcBytes() {
+	
+	var regex = /\(([^]*)\)/;
+	var match = regex.exec(document.getElementById("create").value);
+	var fields = match[1].replace(/\((.*?),.*\)/g,"($1)").split(",");
+	var total = 24;
+	var errors = [];
+	for (i in fields) {
+		var bytes = 0;
+		var comment = 0;
+		var col = fields[i].trim();
+    	if (col.match(/^shard key/i) || col.match(/^key/i)) {
+    		bytes = 40; 
+    	} else if (col.match(/^\#/) || col.match(/^--/) || col.match(/^\/\//)) {
+    		comment = 1;
+    	}  else {
+	    	if (col.match(/primary key/i)){
+	    		bytes += 40;
+	    	}
+	    	var line = col.split(" ");
+	    	var type = line[1];
+
+	    	if (type.match(/^bool/i) || type.match(/^tinyint/i)) {
+	    		bytes += 2;
+	    	} else if (type.match(/^bit/i)) {
+	    		bytes += 9;   	
+	    	} else if (type.match(/^smallint/i) || type.match(/^mediumint/i)){
+	    		bytes += 4;
+	    	} else if (type.match(/^int/i)) {
+	    		bytes += 8;
+	    	} else if (type.match(/^bigint/i)) {
+	    		bytes += 12;
+	    	} else if (type.match(/^double/i) || type.match (/^real/i)) {
+	    		bytes += 8;
+	    	} else if (type.match(/^float/i)) {
+	    		bytes += 4;
+	    	} else if (type.match(/^dec/i) || type.match(/^fixed/i) || type.match(/^numeric/i)){
+	    		ps = regex.exec(line);
+	    		p = parseInt(ps[1].trim());
+	    		bytes += Math.ceil(p/9) * 4;
+	    	} else if (type.match(/^date/i) || type.match(/^time/i) || type.match(/^timestamp.?\(6\)/i)){
+	    		bytes += 8;
+	    	} else if (type.match(/^timestamp/i)) {
+	    		bytes += 4;
+	    	} else if (type.match(/^year/i)) {
+	    		bytes += 2;
+	    	} else if (type.match(/^datetime/i) || type.match(/^datetime.?\(6\)/i)){
+	    		bytes += 12;
+	    	} else if (type.match(/^char/i)) {
+	    		ps = regex.exec(line);
+	    		p = parseInt(ps[1].trim());
+	    		bytes += 3*p + 4;
+	    	} else if (type.match(/^binary/i)) {
+	    		ps = regex.exec(line);
+	    		p = parseInt(ps[1].trim());
+	    		bytes += p + 4;
+	    	} else if (type.match(/^varchar/i) || type.match(/^varbinary/i)){
+	    		ps = regex.exec(line);
+	    		p = parseInt(ps[1].trim());
+	    		if (p < 8)
+	    			bytes += p; 		
+	    		else
+	    			bytes += p + 12;
+	    	} else if (type.match(/^json/i)) {
+	    		bytes += 20 + json_size;
+	    	} else if (type.match(/^geographypoint/i)) {
+	    		bytes += 8;
+	    	} else if (type.match(/^geography/i)) {
+	    		bytes += 64 + vertexes;
+	    	} else if (type.match(/^enum/i)) {
+	    		bytes += 4;
+	    	} else if (type.match(/^set/i)) {
+	    		bytes += 12;
+	    	}
+	    }
+    	if (bytes == 0 && comment == 0) {
+    		errors.push(fields[i]);
+    	}
+    	total += bytes;
+	}
+	document.getElementById("out").innerHTML = sizeOf(total * document.getElementById("rows").value);
+	if (errors.length > 0) document.getElementById("errors").innerHTML = "Errors\n" + errors.join("\n");
+}
+</script>
+<body onLoad="calcBytes()">
+<h1>Really Rough Rowstore Usage</h1>
+<ul>
+	<li>Can only do one table at a time</li>
+	<li>Doesn't check syntax</li>
+	<li>Does not account for NOT NULL</li>
+</ul>
+<textarea id="create" rows="40" cols="100" onChange="calcBytes()">
+create table (a int, b int, primary key (a));
+</textarea>
+<br/>
+Rows <input type="text" id="rows" value="1" onChange="calcBytes()"><br/>
+Total <div id="out" style="display:inline"></div>
+<br/>
+<div id="errors"></div>
+</text>
+</body>
+</html>
